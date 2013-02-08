@@ -6,6 +6,8 @@ TiShadow provides Titanium developers the ability to deploy apps or code snippet
 There are three parts to TiShadow: the TiShadow server, TiShadow app and TiShadow CLI
 for deploying full applications.
 
+Video from CodeStrong 2012 - http://vimeo.com/52765327
+
 ~~Have a look at the following [video](http://www.youtube.com/watch?v=xUggUXQArUM) to get any idea of how to use TiShadow and what it can do.~~ (Outdated)
 
 ~~Have a look at this [presentation](http://www.slideshare.net/londontitanium/titanium-london-tishadow-july-2012) (July 2012) given at the TiLondon meetup for a look at most of what you can do with TiShadow.~~ (Also outdated but more recent)
@@ -13,6 +15,11 @@ for deploying full applications.
 
 Getting Started
 ===============
+
+Setup upstream
+--------------
+``git remote add upstream git://github.com/dbankier/TiShadow.git```
+Update and merge from upstream: ```git fetch upstream && git merge [your branch]/upstream
 
 TiShadow Install
 ----------------
