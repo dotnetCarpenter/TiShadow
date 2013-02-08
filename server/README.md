@@ -18,8 +18,9 @@ Getting Started
 
 Setup upstream
 --------------
-``git remote add upstream git://github.com/dbankier/TiShadow.git```
-Update and merge from upstream: ```git fetch upstream && git merge [your branch]/upstream
+```git remote add upstream git://github.com/dbankier/TiShadow.git```
+
+Update and merge from upstream: ```git fetch upstream && git merge [your branch]/upstream``
 
 TiShadow Install
 ----------------
