@@ -5,7 +5,7 @@ var path = require("path"),
     api = require("./api"),
     bundle = require("./bundle"),
     config = require("./config"),
-    logger = require("../../logger.js"),
+    logger = require("../../server/logger.js"),
     jshint = require("./jshint_runner");
 
     require("./fs_extension");
@@ -20,7 +20,7 @@ function prepare(src, dst, callback) {
       .replace(/require\(/g, "__p.require(")
       .replace(/Ti(tanium)?.include\(/g, "__p.include(this,")
       .replace(/Ti.Locale.getString/g, "L")
-      .replace(/([ :=\(])(['"])(\/[^"].*?)(['"])/g, "$1__p.file($2$3$4)") // ignores "/"
+      .replace(/([ :=\(])(['"])(\/[^'"].*?)(['"])/g, "$1__p.file($2$3$4)") // ignores "/"
       .replace(/Ti(tanium)?.API/g, "__log");
     if (src.match("_spec.js$")) {
       src_text =  "var jasmine = require('/lib/jasmine-1.2.0');var methods = ['spyOn','it','xit','expect','runs','waits','waitsFor','beforeEach','afterEach','describe','xdescribe'];methods.forEach(function(method) {this[method] = jasmine[method];});"
@@ -34,34 +34,36 @@ function prepare(src, dst, callback) {
   }
 }
 
-function prepareFiles(index, file_list, i18n_list) {
+function prepareFiles(index, file_list, isSpec, callback) {
   if (file_list.files.length === index) {
-    finalise(file_list, i18n_list);
+    callback();
   } else {
     var file = file_list.files[index];
-    prepare(path.join(config.resources_path,file), path.join(config.tishadow_src, file), function(){
+    prepare(path.join(isSpec? config.base : config.resources_path,file), path.join(config.tishadow_src, file), function(){
       index++;
-      prepareFiles(index, file_list, i18n_list);
+      prepareFiles(index, file_list, isSpec, callback);
     });
   }
 }
 
-function finalise(file_list, i18n_list) {
+function finalise(file_list,callback) {
   // Bundle up to go
-  file_list.files = file_list.files.concat(i18n_list.files);
   var total = file_list.files.length;
   bundle.pack(file_list.files,function(written) { 
     logger.info(total+ " file(s) bundled."); 
     fs.touch(config.last_updated_file);
     if (config.isBundle) {
       logger.info("Bundle Ready: " + config.bundle_file);
+      if (callback) {
+        callback();
+      }
     } else {
       api.newBundle();
     }
   });
 }
 
-module.exports = function(env) {
+module.exports = function(env, callback) {
   if (!fs.existsSync(path.join(config.base,'tiapp.xml'))) {
     logger.error("Script must be executed in the Titanium project's root directory");
     process.exit();
@@ -74,13 +76,14 @@ module.exports = function(env) {
     }
 
     logger.info("Beginning Build Process");
-    var file_list,i18n_list;
+    var file_list,i18n_list,spec_list;
     if( config.isUpdate) {
        var last_stat = fs.statSync(config.last_updated_file);
        file_list = fs.getList(config.resources_path,last_stat.mtime);
        i18n_list = fs.getList(config.i18n_path,last_stat.mtime);
+       spec_list = fs.getList(config.spec_path,last_stat.mtime);
 
-       if (file_list.files.length === 0 && i18n_list.files.length === 0) {
+       if (file_list.files.length === 0 && i18n_list.files.length === 0 && spec_list.files.length === 0) {
          logger.error("Nothing to update.");
          process.exit();
        }
@@ -96,19 +99,29 @@ module.exports = function(env) {
        fs.mkdirs([config.tishadow_build, config.tishadow_src, config.tishadow_dist]);
        file_list = fs.getList(config.resources_path);
        i18n_list = fs.getList(config.i18n_path);
+       spec_list = fs.getList(config.spec_path);
      }
 
      // Build the required directory structure
      fs.mkdirs(file_list.dirs, config.tishadow_src);
      fs.mkdirs(i18n_list.dirs, config.tishadow_src);
-     
-     
+     if(spec_list.files.length > 0) {
+       fs.mkdirSync(config.tishadow_spec, 0755);
+       fs.mkdirs(spec_list.dirs, config.tishadow_spec);
+       spec_list.files = spec_list.files.map(function(file) { return "spec/" + file;});
+     }
+
      // Just pump out localisation files
      i18n_list.files.forEach(function(file, idx) {
        util.pump(fs.createReadStream(path.join(config.i18n_path,file)),fs.createWriteStream(path.join(config.tishadow_src, file)));
      });
 
      // Process Files
-     prepareFiles(0, file_list, i18n_list);
+     prepareFiles(0, file_list, false, function() {
+       prepareFiles(0, spec_list, true, function() {
+          file_list.files = file_list.files.concat(i18n_list.files).concat(spec_list.files);
+          finalise(file_list,callback);
+       });
+     });
   });
 }
